@@ -1,7 +1,5 @@
 # Zomato AI Data Engineering — End-to-End Project
 
-> 🎥 **Video walkthrough:** [Watch the full project tutorial on YouTube](https://youtu.be/kYwaNMQ3XT8?si=Ge8ilVxkmGQS6iIg)
-
 A complete batch data pipeline that takes Zomato-style food delivery data from raw CSVs all the way to AI-powered analytics:
 
 **Zomato/Food Delivery Dataset → Amazon S3 → Snowflake → dbt → Airflow → AI (OpenAI)**
@@ -10,19 +8,21 @@ The dataset lands in an S3 data lake and flows into Snowflake through a storage 
 
 ![Architecture](docs/architecture.png)
 
-> 📂 **Dataset + project slides:** [Google Drive folder](https://drive.google.com/drive/folders/1FEnGWMHhHzzTUCZOw1-YnH2v3DMuM-rs?usp=sharing) — download the CSVs here and place them under `data/` (they're too large to commit to the repo).
+> 📂 **Dataset + project slides:** [Google Drive folder](https://drive.google.com/drive/folders/1FyuhoNWismwbn_vAaAbsbWZSCuIVyabF?usp=sharing) — download the CSVs here and place them under `data/` (they're too large to commit to the repo).
+
+> 💻 **GitHub repository:** [mayanktak15/zomato-pipeline-ai-de](https://github.com/mayanktak15/zomato-pipeline-ai-de)
 
 ## What gets built
 
-| Layer | Where | What |
-|---|---|---|
-| **Source** | `data/` (local) | 4 real dimension CSVs (restaurants, users, food, menu) + 3 generated fact files: **10M orders**, **~23M order items**, **300K free-text reviews** |
-| **Lake** | Amazon S3 | One bucket, `raw/<table>/` folder per CSV |
-| **Bronze** | Snowflake `ZOMATO.RAW` | `COPY INTO` from S3 via a keyless storage integration |
-| **Silver** | Snowflake `ZOMATO.STAGING` | dbt staging views — clean, type, rename every source |
-| **Gold** | Snowflake `ZOMATO.MARTS` | Dimensions, **incremental** facts (MERGE), business marts + an SCD2 snapshot |
-| **AI** | Snowflake `ZOMATO.AI` | LLM-enriched reviews (sentiment/topic), RAG chat, text-to-SQL |
-| **Orchestration** | Airflow (Docker) | One daily DAG: load → transform → enrich → AI mart |
+| Layer             | Where                      | What                                                                                                                                              |
+| ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source**        | `data/` (local)            | 4 real dimension CSVs (restaurants, users, food, menu) + 3 generated fact files: **10M orders**, **~23M order items**, **300K free-text reviews** |
+| **Lake**          | Amazon S3                  | One bucket, `raw/<table>/` folder per CSV                                                                                                         |
+| **Bronze**        | Snowflake `ZOMATO.RAW`     | `COPY INTO` from S3 via a keyless storage integration                                                                                             |
+| **Silver**        | Snowflake `ZOMATO.STAGING` | dbt staging views — clean, type, rename every source                                                                                              |
+| **Gold**          | Snowflake `ZOMATO.MARTS`   | Dimensions, **incremental** facts (MERGE), business marts + an SCD2 snapshot                                                                      |
+| **AI**            | Snowflake `ZOMATO.AI`      | LLM-enriched reviews (sentiment/topic), RAG chat, text-to-SQL                                                                                     |
+| **Orchestration** | Airflow (Docker)           | One daily DAG: load → transform → enrich → AI mart                                                                                                |
 
 ## Tech stack
 
@@ -30,7 +30,7 @@ Python · Pandas · Amazon S3 · Snowflake · dbt (dbt-snowflake) · Apache Airf
 
 ## Repository structure
 
-```
+```text
 ├── airflow/                  # Airflow 3 on Docker
 │   ├── Dockerfile            #   Snowflake + OpenAI providers, dbt in its own venv
 │   ├── docker-compose.yaml   #   postgres + api-server + scheduler; creds via env vars
@@ -55,7 +55,7 @@ Python · Pandas · Amazon S3 · Snowflake · dbt (dbt-snowflake) · Apache Airf
 └── docs/architecture.png     # architecture diagram
 ```
 
-> `data/` (~2.3 GB of CSVs), logs, and dbt `target/` artifacts are intentionally not committed — get the dataset and slides from the [Google Drive folder](https://drive.google.com/drive/folders/1FEnGWMHhHzzTUCZOw1-YnH2v3DMuM-rs?usp=sharing).
+> `data/` (~2.3 GB of CSVs), logs, and dbt `target/` artifacts are intentionally not committed — get the dataset and slides from the [Google Drive folder](https://drive.google.com/drive/folders/1FyuhoNWismwbn_vAaAbsbWZSCuIVyabF?usp=sharing).
 
 ## How the pipeline works
 
@@ -67,13 +67,13 @@ The seven CSVs are uploaded to `s3://<BUCKET>/raw/<table>/` — one folder per t
 
 Snowflake reads the bucket with **no stored keys**, using a storage integration + an IAM role. The Snowflake side is [`snowflake/02_storage_integration.sql`](snowflake/02_storage_integration.sql); the AWS JSON documents live in [`aws/iam/`](aws/iam/):
 
-| File | Used for |
-|---|---|
-| [`s3-read-policy.json`](aws/iam/s3-read-policy.json) | IAM **policy** `zomato-s3-read` — read-only access to the bucket |
-| [`snowflake-role-trust-policy-initial.json`](aws/iam/snowflake-role-trust-policy-initial.json) | IAM **role** `snowflake-s3-role` — placeholder trust used at creation time |
-| [`snowflake-role-trust-policy-final.json`](aws/iam/snowflake-role-trust-policy-final.json) | Final trust — Snowflake's IAM user ARN + external ID from `DESC INTEGRATION` |
+| File                                                                                           | Used for                                                                     |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`s3-read-policy.json`](aws/iam/s3-read-policy.json)                                           | IAM **policy** `zomato-s3-read` — read-only access to the bucket             |
+| [`snowflake-role-trust-policy-initial.json`](aws/iam/snowflake-role-trust-policy-initial.json) | IAM **role** `snowflake-s3-role` — placeholder trust used at creation time   |
+| [`snowflake-role-trust-policy-final.json`](aws/iam/snowflake-role-trust-policy-final.json)     | Final trust — Snowflake's IAM user ARN + external ID from `DESC INTEGRATION` |
 
-The order matters: create the AWS policy + role → create the Snowflake `STORAGE INTEGRATION` pointing at the role ARN → `DESC INTEGRATION` to get `STORAGE_AWS_IAM_USER_ARN` and `STORAGE_AWS_EXTERNAL_ID` → paste both into the role's trust policy. (Two hard-won lessons: the trust `Principal` must be Snowflake's IAM user ARN, not `:root` — and never re-run `CREATE OR REPLACE` on the integration afterward, it regenerates the external ID and breaks the trust.)
+The order matters: create the AWS policy + role → create the Snowflake `STORAGE INTEGRATION` pointing at the role ARN → `DESC INTEGRATION` to get `STORAGE_AWS_IAM_USER_ARN` and `STORAGE_AWS_EXTERNAL_ID` → paste both into the role's trust policy. Two important lessons: the trust `Principal` must be Snowflake's IAM user ARN, not `:root` — and never re-run `CREATE OR REPLACE` on the integration afterward, because it regenerates the external ID and breaks the trust.
 
 ### 3 · Load — `COPY INTO`
 
@@ -81,17 +81,17 @@ Table DDL ([`snowflake/04_raw_tables.sql`](snowflake/04_raw_tables.sql)) matches
 
 ### 4 · Transform — dbt (medallion)
 
-- **Staging (Silver)** — one view per source: parse the messy restaurant dimension (`--` → null, `₹ 200` → 200), lowercase emails, derive `is_delivered`, etc.
-- **Dimensions (Gold)** — `dim_restaurants`, `dim_customer` (with age segments), `dim_food`, a generated `dim_date` calendar.
-- **Facts (Gold, incremental)** — `fct_orders` and `fact_order_items` use `materialized='incremental'` with a MERGE strategy, so a re-run processes only new rows instead of rebuilding 10M+.
-- **Marts (Gold)** — one table per business question: daily city revenue (GMV/AOV/cancel rate), restaurant performance, delivery SLA (p50/p90 by city & hour), review insights.
-- **Tests** — `unique` / `not_null` / `relationships` / `accepted_values` plus a singular reconciliation test; `dbt build` runs models and tests in dependency order.
+* **Staging (Silver)** — one view per source: parse the messy restaurant dimension (`--` → null, `₹ 200` → 200), lowercase emails, derive `is_delivered`, etc.
+* **Dimensions (Gold)** — `dim_restaurants`, `dim_customer` (with age segments), `dim_food`, a generated `dim_date` calendar.
+* **Facts (Gold, incremental)** — `fct_orders` and `fact_order_items` use `materialized='incremental'` with a MERGE strategy, so a re-run processes only new rows instead of rebuilding 10M+.
+* **Marts (Gold)** — one table per business question: daily city revenue (GMV/AOV/cancel rate), restaurant performance, delivery SLA (p50/p90 by city & hour), review insights.
+* **Tests** — `unique` / `not_null` / `relationships` / `accepted_values` plus a singular reconciliation test; `dbt build` runs models and tests in dependency order.
 
 ### 5 · Orchestrate — Airflow
 
 One daily DAG, [`zomato_batch`](airflow/dags/zomato_batch.py), runs the whole thing as a single graph:
 
-```
+```text
 reload_raw  →  dbt_build_core  →  enrich_reviews  →  dbt_build_ai
 (COPY from S3)  (dbt build + tests)  (OpenAI enrichment)   (AI mart)
 ```
